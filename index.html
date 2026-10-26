@@ -1,0 +1,418 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Prompteur">
+<meta name="theme-color" content="#0E0D0C">
+<style>*,*::before,*::after{box-sizing:border-box}:root{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}body{margin:0}img{max-width:100%}[hidden]{display:none!important}</style>
+<title>Prompteur ZaatTech</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:wght@400;700&family=JetBrains+Mono:wght@500;700&display=swap">
+<style>
+/* Layout : éditeur (script + réglages) puis plein écran noir façon prompteur, ligne de lecture au tiers haut */
+:root{
+  --bg:#0E0D0C; --panel:#1A1816; --line:#2F2B27; --fg:#F4F1EC; --muted:#9A938A; --accent:#FFC72C; --warn:#FF8A5B;
+  --read:"Atkinson Hyperlegible",system-ui,sans-serif; --mono:"JetBrains Mono",ui-monospace,Menlo,monospace;
+  color-scheme:dark;
+}
+html,body{height:100%}
+body{background:var(--bg);color:var(--fg);font-family:var(--read);font-size:16px;line-height:1.5}
+button,input,textarea{font:inherit;color:inherit}
+button{cursor:pointer}
+button:focus-visible,input:focus-visible,textarea:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+
+/* ---------- Éditeur ---------- */
+.edit{max-width:1100px;margin:0 auto;padding-block:24px 40px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));display:grid;gap:18px}
+.edit h1{margin:0;font-size:clamp(26px,5vw,36px);line-height:1.1;font-weight:700;text-wrap:balance}
+.edit h1 b{color:var(--accent)}
+.lead{margin:6px 0 0;color:var(--muted);max-width:64ch}
+.grid{display:grid;grid-template-columns:minmax(0,1fr) 300px;gap:18px;align-items:start}
+@media (max-width:820px){.grid{grid-template-columns:minmax(0,1fr)}}
+.box{background:var(--panel);border:1px solid var(--line);border-radius:10px;min-width:0}
+.scriptbox{display:grid}
+.boxhead{display:flex;flex-wrap:wrap;gap:8px;align-items:center;justify-content:space-between;padding:12px 14px;border-bottom:1px solid var(--line)}
+.boxhead h2,.settings h2{margin:0;font-size:12px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted)}
+.stats{font:500 13px var(--mono);color:var(--muted);font-variant-numeric:tabular-nums}
+.stats b{color:var(--fg);font-weight:700}
+textarea{width:100%;min-height:52vh;resize:vertical;background:transparent;border:0;padding:14px;font:15px/1.6 var(--read);box-sizing:border-box}
+.boxfoot{display:flex;flex-wrap:wrap;gap:8px;padding:10px 14px;border-top:1px solid var(--line)}
+.ghost{background:transparent;border:1px solid var(--line);border-radius:8px;padding:8px 12px;font-size:14px}
+.ghost.danger{border-color:var(--warn);color:var(--warn)}
+.settings{padding:16px;display:grid;gap:16px}
+.field{display:grid;gap:6px}
+.field label{display:flex;justify-content:space-between;gap:8px;font-weight:700;font-size:14px}
+.field output{font:500 13px var(--mono);color:var(--accent);font-variant-numeric:tabular-nums}
+input[type=range]{width:100%;accent-color:var(--accent)}
+.check{display:flex;gap:10px;align-items:flex-start;font-size:14px}
+.check input{margin-top:3px;width:18px;height:18px;accent-color:var(--accent);flex:none}
+.check small{display:block;color:var(--muted);font-size:13px}
+.go{background:var(--accent);color:#111111;border:0;border-radius:10px;padding:14px 18px;font-weight:700;font-size:17px}
+.tip{margin:0;color:var(--muted);font-size:13px}
+
+/* ---------- Prompteur ---------- */
+.prompter{position:fixed;inset:0;background:#000000;z-index:20;display:flex;flex-direction:column}
+.bar-top{height:3px;background:#222222;flex:none;margin-top:env(safe-area-inset-top,0px)}
+.bar-top i{display:block;height:100%;width:0;background:var(--accent)}
+.scroller{flex:1;overflow-y:auto;overflow-x:hidden;position:relative;scrollbar-width:none;-webkit-overflow-scrolling:touch}
+.scroller::-webkit-scrollbar{display:none}
+.pt{margin:0 auto;padding:36vh max(20px,env(safe-area-inset-right,0px)) 75vh max(20px,env(safe-area-inset-left,0px));color:#FFFFFF;font-family:var(--read);font-weight:700;line-height:1.38;letter-spacing:.01em}
+.pt.mirror{transform:scaleX(-1)}
+.pt p{margin:0 0 .9em}
+.pt .sec{display:block;margin:1.4em 0 .5em;font:700 .42em/1.2 var(--mono);letter-spacing:.14em;text-transform:uppercase;color:var(--accent)}
+.pt .pause{display:block;margin:0 0 .9em;color:#777777;font-weight:400;font-size:.6em}
+.pt .todo{display:block;margin:0 0 .9em;padding:.4em .6em;border:2px dashed var(--accent);border-radius:8px;color:var(--accent);font-size:.55em;font-weight:400}
+.pt .cue{display:block;margin:0 0 .9em;color:#6F6A64;font:400 .45em/1.3 var(--mono)}
+.pt .end{display:block;text-align:center;color:#777777;font-size:.5em;letter-spacing:.2em;text-transform:uppercase}
+.readline{position:absolute;left:0;right:0;top:33%;pointer-events:none;z-index:2}
+.readline::before,.readline::after{content:"";position:absolute;top:-10px;border:10px solid transparent}
+.readline::before{left:4px;border-left-color:var(--accent)}
+.readline::after{right:4px;border-right-color:var(--accent)}
+.fade{position:absolute;left:0;right:0;pointer-events:none;z-index:1}
+.fade.t{top:0;height:20%;background:linear-gradient(#000000,rgba(0,0,0,0))}
+.fade.b{bottom:0;height:30%;background:linear-gradient(rgba(0,0,0,0),#000000)}
+.stagewrap{position:relative;flex:1;display:flex;min-height:0}
+.count{position:absolute;inset:0;display:grid;place-items:center;font:700 34vmin/1 var(--read);color:var(--accent);z-index:5;pointer-events:none}
+.ctrl{flex:none;display:flex;flex-wrap:wrap;gap:6px;align-items:center;justify-content:center;padding:10px max(12px,env(safe-area-inset-right,0px)) calc(10px + env(safe-area-inset-bottom,0px)) max(12px,env(safe-area-inset-left,0px));background:#0B0B0B;border-top:1px solid #222222;transition:opacity .3s}
+.prompter.playing .ctrl{opacity:.28}
+.prompter.playing .ctrl:hover,.prompter.playing .ctrl:focus-within{opacity:1}
+.ctrl button{min-width:44px;min-height:44px;background:#1C1C1C;border:1px solid #333333;border-radius:8px;padding:6px 12px;font-size:15px;font-weight:700;color:#FFFFFF}
+.ctrl button.main{background:var(--accent);color:#111111;border-color:var(--accent);min-width:96px}
+.ctrl button[aria-pressed="true"]{border-color:var(--accent);color:var(--accent)}
+.ctrl .val{font:500 13px var(--mono);color:#BBBBBB;min-width:84px;text-align:center;font-variant-numeric:tabular-nums}
+.ctrl .sep{width:1px;height:28px;background:#333333}
+@media (prefers-reduced-motion:reduce){.ctrl{transition:none}}
+</style>
+
+</head>
+<body>
+<main class="edit" id="edit">
+  <header>
+    <h1>Prompteur <b>ZaatTech</b></h1>
+    <p class="lead">Colle ton script dans le cadre (appui long puis « Coller » sur téléphone), règle la vitesse, lance. Les indications [B-ROLL] et [SFX] sont masquées automatiquement. Ton script et tes réglages restent enregistrés dans ce navigateur.</p>
+  </header>
+  <div class="grid">
+    <section class="box scriptbox" aria-labelledby="h-script">
+      <div class="boxhead"><h2 id="h-script">Ton script</h2><span class="stats" id="stats"></span></div>
+      <textarea id="script" spellcheck="false" aria-labelledby="h-script"></textarea>
+      <div class="boxfoot">
+        <button class="ghost" id="sample" type="button">Charger le script Recouvra</button>
+        <button class="ghost danger" id="clear" type="button">Effacer</button>
+      </div>
+    </section>
+    <aside class="box settings" aria-label="Réglages">
+      <h2>Réglages</h2>
+      <div class="field"><label for="wpm">Vitesse <output id="o-wpm"></output></label><input type="range" id="wpm" min="80" max="220" step="5"></div>
+      <div class="field"><label for="size">Taille du texte <output id="o-size"></output></label><input type="range" id="size" min="24" max="96" step="2"></div>
+      <div class="field"><label for="width">Largeur de la colonne <output id="o-width"></output></label><input type="range" id="width" min="40" max="100" step="5"></div>
+      <label class="check"><input type="checkbox" id="strip"><span>Masquer B-ROLL et SFX<small>Les lignes entre crochets ne s’affichent pas.</small></span></label>
+      <label class="check"><input type="checkbox" id="mirror"><span>Texte en miroir<small>Pour un prompteur à vitre réfléchissante.</small></span></label>
+      <label class="check"><input type="checkbox" id="countdown"><span>Compte à rebours de 3 s<small>Le temps de te mettre en place.</small></span></label>
+      <button class="go" id="start" type="button">Lancer le prompteur</button>
+      <p class="tip">Pendant la lecture : touche l’écran pour pause / reprise, fais glisser pour revenir en arrière. Au clavier : Espace, ↑ ↓ pour la vitesse, Échap pour quitter.</p>
+    </aside>
+  </div>
+</main>
+
+<div class="prompter" id="prompter" hidden>
+  <div class="bar-top"><i id="prog"></i></div>
+  <div class="stagewrap">
+    <div class="scroller" id="scroller"><div class="pt" id="pt"></div></div>
+    <div class="fade t"></div><div class="fade b"></div>
+    <div class="readline" aria-hidden="true"></div>
+    <div class="count" id="count" hidden></div>
+  </div>
+  <div class="ctrl">
+    <button class="main" id="pp" type="button">Lecture</button>
+    <button id="top" type="button" aria-label="Revenir au début">Début</button>
+    <span class="sep"></span>
+    <button id="slow" type="button" aria-label="Plus lent">−</button>
+    <span class="val" id="v-wpm"></span>
+    <button id="fast" type="button" aria-label="Plus rapide">+</button>
+    <span class="sep"></span>
+    <button id="small" type="button" aria-label="Texte plus petit">A−</button>
+    <button id="big" type="button" aria-label="Texte plus grand">A+</button>
+    <button id="mir" type="button" aria-pressed="false">Miroir</button>
+    <span class="val" id="v-left"></span>
+    <button id="quit" type="button">Quitter</button>
+  </div>
+</div>
+
+<script type="text/plain" id="sampleText">### Accroche
+
+[B-ROLL : gros plan sur ton écran, un dossier « recouvra » sélectionné]
+
+C'était il y a quelques semaines. Il était tard. J'avais devant moi une application que j'avais codée pendant des mois. Des clients l'utilisaient déjà.
+
+Et je venais de découvrir qu'elle était pleine de bugs. Pas un ou deux. Des dizaines.
+
+[SFX : clic de souris]
+
+Cette nuit-là, j'ai pris la décision la plus dure depuis que je code : tout recommencer à zéro.
+
+Moi c'est Massaly. Je suis en Licence 2 informatique, à Dakar. Et cette application, elle s'appelle Recouvra. Pour comprendre pourquoi je l'ai détruite… il faut revenir au tout début.
+
+### 1. Le premier client
+
+Quand j'ai commencé, je connaissais quoi ? Un peu de HTML. Un peu de CSS. Et du C, qu'on apprend à l'université. C'est tout. Pas de JavaScript, pas de framework, rien.
+
+Et pourtant, mon premier vrai client est arrivé : Sylla Automobile, un commerce de pièces détachées à Ziguinchor.
+
+Leur problème était simple. Des milliers de pièces. Des références partout. Et personne ne savait exactement ce qu'il restait en stock.
+
+Alors je leur ai construit une application sur mesure. Gestion du stock, factures, tout.
+
+Puis est venu le moment que je redoutais : le prix.
+
+Dans ma tête, c'était 115 000 FCFA. J'avais répété le chiffre devant le miroir. Sérieux.
+
+Et puis on a discuté. On a wakhalé. Et j'ai fini par la vendre 80 000 FCFA.
+
+Sur le coup, j'étais un peu déçu. Mais j'ai ajouté un abonnement mensuel d'entretien. Et ça, je ne le savais pas encore, c'était la meilleure idée de toute l'histoire.
+
+Parce que pour la première fois, je n'étais plus juste un étudiant qui code. J'avais un client qui me faisait confiance chaque mois.
+
+Mais quelques semaines plus tard, un deuxième commerçant m'a appelé. Et ce qu'il m'a demandé a tout changé.
+
+### 2. Le déclic
+
+C'était une quincaillerie. Et elle voulait… presque exactement la même chose. Stock, factures, clients.
+
+Au début, je me suis dit : bon, je copie le code de Sylla, je change les couleurs, et voilà.
+
+Mais en discutant avec eux, j'ai remarqué un truc. Le vrai problème, ce n'était pas le stock. C'était le crédit.
+
+Vous le savez. Au Sénégal, le client vient, il prend la marchandise, et il dit : « je paie la semaine prochaine ». Le commerçant note dans un cahier. Et ce cahier… il grossit. Il grossit. Il grossit.
+
+[À COMPLÉTER : le moment précis et la phrase exacte du commerçant]
+
+C'est là que j'ai compris. Ce n'était pas le problème d'un seul commerçant. C'était le problème de tous les commerçants.
+
+Et l'idée est née : une app qui gère le stock, oui. Mais surtout une app qui suit qui doit combien. Et qui permet de relancer le client sur WhatsApp, en un seul clic.
+
+Je l'ai appelée Recouvra.
+
+Sauf que j'avais un petit problème. Je ne savais pas vraiment coder une app comme ça.
+
+### 3. La construction
+
+La technique, je vous la fais simple. HTML, CSS, JavaScript pour l'interface. Supabase pour la base de données. Et Vercel pour mettre le site en ligne.
+
+Le JavaScript, je ne le maîtrisais pas. Alors j'ai fait ce que beaucoup d'entre vous font sans le dire : j'ai beaucoup codé avec l'IA.
+
+Je décrivais ce que je voulais. L'IA me proposait du code. Je testais. Ça cassait. Je recommençais.
+
+Et le plus fou ? Une grande partie de Recouvra, je l'ai mise à jour… depuis mon téléphone.
+
+Je modifiais un fichier, je l'envoyais sur GitHub, et quelques secondes plus tard, le site se mettait à jour tout seul.
+
+Pas de bureau. Pas d'ordinateur puissant. Juste un téléphone, de la connexion… quand il y en avait… et beaucoup de café Touba.
+
+Et ça marchait. Les écrans s'affichaient. Les factures sortaient. Les boutons WhatsApp envoyaient les messages.
+
+Je me sentais invincible.
+
+Et c'est exactement là que tout a failli s'arrêter.
+
+### 4. La chute
+
+Un jour, je me suis dit : avant d'aller plus loin, je vais faire un audit complet. Vérifier tout le code, ligne par ligne.
+
+Et là… la liste a commencé à défiler. Et elle ne s'arrêtait pas.
+
+Des bugs dans les paiements. Des bugs dans les abonnements. Et des problèmes de sécurité. Des choses qu'on ne voyait pas à l'écran, mais qui étaient là, cachées.
+
+Des dizaines.
+
+Je vais être honnête avec vous. Ce soir-là, je me suis senti nul. Vraiment nul. Je me suis demandé si j'étais un vrai développeur, ou juste quelqu'un qui copie-colle ce que l'IA lui donne.
+
+[pause – 2 secondes de silence]
+
+Et j'avais deux choix. Corriger les bugs un par un, et espérer que ça tienne. Ou tout reprendre depuis le début, proprement, en comprenant chaque ligne.
+
+Dafa metti. C'est dur. Parce que recommencer, ça veut dire accepter que des mois de travail ne suffisent pas.
+
+Mais je pensais à mes clients. À leur argent. À leurs données. Je ne pouvais pas leur donner un outil fragile.
+
+Alors j'ai recommencé à zéro.
+
+Et vous pensez que le plus dur était derrière moi ? Non. Le plus dur, ce n'était pas le code.
+
+### 5. Les galères business
+
+Une fois la nouvelle version prête, il fallait la vendre. Et là, j'ai découvert un autre monde.
+
+D'abord, le nom de domaine. J'en ai acheté un. Puis j'ai changé d'avis sur le nom. Je me suis fait rembourser. Et au final… j'ai tout annulé.
+
+Oui. Moi-même je ne comprends pas.
+
+Résultat : Recouvra est resté sur l'adresse recouvra.vercel.app.
+
+Et quand j'envoyais ce lien à des commerçants, je voyais leur visage changer. « C'est quoi ce Vercel ? C'est sûr ça ? »
+
+J'ai compris un truc important ce jour-là. Pour un commerçant, une adresse qui fait bizarre, ça ressemble à une arnaque. Même si l'app est bonne.
+
+Deuxième galère : je n'ai pas encore de NINEA. Donc pas de paiement automatique.
+
+Quand un commerçant paie son abonnement par Wave ou Orange Money, je reçois la notification. Je vérifie. Et j'active son compte… à la main.
+
+Chaque abonnement. Un par un.
+
+Ce n'est pas glamour. Mais ndank ndank, ça avance.
+
+Alors, après tout ça… est-ce que quelqu'un utilise vraiment Recouvra aujourd'hui ?
+
+### 6. Aujourd'hui
+
+[À COMPLÉTER : le nombre exact d'utilisateurs ou de commerces clients]
+
+[À COMPLÉTER : un retour client marquant]
+
+Et la prochaine étape, elle me fait un peu peur, je l'avoue : publier Recouvra sur Google Play et sur l'App Store.
+
+Pour qu'un commerçant puisse juste taper « Recouvra » dans son téléphone. Et le trouver. Sans lien bizarre.
+
+### 7. La leçon
+
+Si vous devez retenir une seule chose de cette vidéo, c'est celle-là.
+
+L'IA peut écrire du code pour vous. Mais elle ne peut pas comprendre votre code à votre place. Le jour où il y a un bug, c'est vous qui devez savoir.
+
+Et la deuxième partie de la leçon : votre premier client n'achète pas votre code. Il achète votre confiance. Un nom clair, un prix honnête, et le courage de tout reprendre quand ce n'est pas assez bien.
+
+Comme on dit chez nous : Yalla Yalla, bey sa tool. Prie Dieu, mais cultive ton champ.
+
+L'IA, c'est un outil. Le champ, c'est à vous de le cultiver.
+
+### 8. Appel à l'action
+
+Si cette histoire vous a parlé, abonnez-vous à ZaatTech. Ici, on parle de tech, d'IA et de code, simplement, et sans faire semblant que tout est facile.
+
+Et si vous êtes commerçant, ou si vous connaissez un commerçant qui a un cahier de crédit qui déborde : vous pouvez essayer Recouvra gratuitement pendant 14 jours.
+
+Il suffit d'écrire « ESSAI » sur WhatsApp au 77 033 80 30.
+
+Et dites-moi en commentaire : vous, vous avez déjà dû tout recommencer à zéro ?
+
+On se retrouve dans la prochaine vidéo.</script>
+
+<script>
+const $=id=>document.getElementById(id);
+const KEY='prompteur-zaattech-v1';
+const DEF={text:'',wpm:140,size:44,width:90,strip:true,mirror:false,countdown:true};
+let S=Object.assign({},DEF);
+try{const raw=localStorage.getItem(KEY);if(raw)Object.assign(S,JSON.parse(raw))}catch(e){}
+if(!S.text)S.text=$('sampleText').textContent.trim();
+let saveT=0;
+function save(){clearTimeout(saveT);saveT=setTimeout(()=>{try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){}},300)}
+
+/* ---------- Analyse du script ---------- */
+const esc=s=>s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+const clean=s=>s.replace(/\*\*|__/g,'').replace(/^\s*(?:[-*•]|\d+[.)])\s+/,'');
+function parse(text,strip){
+  const out=[];let para=[];let words=0;
+  const flush=()=>{if(para.length){const t=para.join(' ');out.push({k:'p',t});words+=t.split(/\s+/).filter(Boolean).length;para=[]}};
+  text.replace(/\r/g,'').split('\n').forEach(raw=>{
+    const line=raw.trim();
+    if(!line){flush();return}
+    if(/^#{1,6}\s+/.test(line)){flush();out.push({k:'sec',t:clean(line.replace(/^#{1,6}\s+/,''))});return}
+    if(/^\[(?:À|A) COMPL/i.test(line)){flush();out.push({k:'todo',t:line.replace(/^\[|\]$/g,'')});return}
+    if(/^\[pause/i.test(line)){flush();out.push({k:'pause',t:'— pause —'});return}
+    if(/^\[[^\]]*\]$/.test(line)){flush();if(!strip)out.push({k:'cue',t:line});return}
+    para.push(clean(line));
+  });
+  flush();
+  return{blocks:out,words};
+}
+
+/* ---------- Éditeur ---------- */
+const ta=$('script');ta.value=S.text;
+const fields=[['wpm',v=>v+' mots/min'],['size',v=>v+' px'],['width',v=>v+' %']];
+fields.forEach(([k,f])=>{const i=$(k),o=$('o-'+k);i.value=S[k];o.textContent=f(S[k]);i.addEventListener('input',()=>{S[k]=+i.value;o.textContent=f(S[k]);save();stats()})});
+['strip','mirror','countdown'].forEach(k=>{const i=$(k);i.checked=S[k];i.addEventListener('change',()=>{S[k]=i.checked;save();stats()})});
+function minutes(w){const m=w/S.wpm;const mm=Math.floor(m),ss=Math.round((m-mm)*60);return ss===60?`${mm+1} min 00`:`${mm} min ${String(ss).padStart(2,'0')}`}
+function stats(){const {words}=parse(S.text,S.strip);$('stats').innerHTML=`<b>${words.toLocaleString('fr-FR')}</b> mots · environ <b>${minutes(words)}</b>`}
+ta.addEventListener('input',()=>{S.text=ta.value;save();stats()});
+stats();
+$('sample').addEventListener('click',()=>{ta.value=$('sampleText').textContent.trim();S.text=ta.value;save();stats()});
+let clearArm=0;
+$('clear').addEventListener('click',e=>{const b=e.currentTarget;if(clearArm){clearTimeout(clearArm);clearArm=0;ta.value='';S.text='';save();stats();b.textContent='Effacer';ta.focus();return}b.textContent='Confirmer l’effacement';clearArm=setTimeout(()=>{clearArm=0;b.textContent='Effacer'},3000)});
+
+/* ---------- Prompteur ---------- */
+const P=$('prompter'),sc=$('scroller'),pt=$('pt'),pp=$('pp'),cnt=$('count');
+let playing=false,pos=0,lastSet=0,lastTs=0,raf=0,pxPerWord=1,totalWords=1,lock=null,countT=0;
+async function wake(on){try{if(on&&!lock&&navigator.wakeLock){lock=await navigator.wakeLock.request('screen');lock.addEventListener('release',()=>{lock=null})}else if(!on&&lock){await lock.release();lock=null}}catch(e){lock=null}}
+document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible'&&playing)wake(true)});
+function build(){
+  const {blocks,words}=parse(S.text,S.strip);totalWords=Math.max(1,words);
+  pt.innerHTML=blocks.map(b=>b.k==='p'?`<p>${esc(b.t)}</p>`:`<span class="${b.k}">${esc(b.t)}</span>`).join('')+'<span class="end">— fin —</span>';
+  layout();
+}
+function layout(){
+  pt.style.fontSize=S.size+'px';pt.style.maxWidth=S.width+'%';pt.classList.toggle('mirror',S.mirror);
+  $('mir').setAttribute('aria-pressed',String(S.mirror));
+  const cs=getComputedStyle(pt);const textH=pt.offsetHeight-parseFloat(cs.paddingTop)-parseFloat(cs.paddingBottom);
+  pxPerWord=Math.max(1,textH/totalWords);
+  $('v-wpm').textContent=S.wpm+' mots/min';
+  hud();
+}
+function hud(){
+  const max=Math.max(1,sc.scrollHeight-sc.clientHeight);const r=Math.min(1,pos/max);
+  $('prog').style.width=(r*100)+'%';
+  $('v-left').textContent='reste '+minutes(totalWords*(1-r)).replace(' min ',':');
+}
+function setPlay(on){
+  playing=on;P.classList.toggle('playing',on);pp.textContent=on?'Pause':'Lecture';wake(on);
+  if(on){lastTs=0;cancelAnimationFrame(raf);raf=requestAnimationFrame(step)}
+}
+function step(ts){
+  if(!playing)return;
+  if(Math.abs(sc.scrollTop-lastSet)>2)pos=sc.scrollTop; // l'utilisateur a fait glisser
+  if(lastTs){const dt=Math.min(.1,(ts-lastTs)/1000);pos+=S.wpm/60*pxPerWord*dt}
+  lastTs=ts;
+  const max=sc.scrollHeight-sc.clientHeight;
+  if(pos>=max){pos=max;sc.scrollTop=pos;lastSet=sc.scrollTop;hud();setPlay(false);return}
+  sc.scrollTop=pos;lastSet=sc.scrollTop;hud();
+  raf=requestAnimationFrame(step);
+}
+sc.addEventListener('scroll',()=>{if(!playing){pos=sc.scrollTop;lastSet=pos;hud()}},{passive:true});
+function countdown(n,done){cnt.hidden=false;cnt.textContent=n;clearTimeout(countT);if(n<=0){cnt.hidden=true;done();return}countT=setTimeout(()=>countdown(n-1,done),1000)}
+function toggle(){if(!cnt.hidden){clearTimeout(countT);cnt.hidden=true;return}setPlay(!playing)}
+function openP(){
+  P.hidden=false;document.body.style.overflow='hidden';build();pos=0;sc.scrollTop=0;lastSet=0;hud();
+  if(P.requestFullscreen&&document.fullscreenEnabled)P.requestFullscreen().catch(()=>{});
+  if(S.countdown)countdown(3,()=>setPlay(true));else setPlay(true);
+}
+function closeP(){setPlay(false);clearTimeout(countT);cnt.hidden=true;P.hidden=true;document.body.style.overflow='';if(document.fullscreenElement)document.exitFullscreen().catch(()=>{})}
+function speed(d){S.wpm=Math.min(220,Math.max(80,S.wpm+d));$('wpm').value=S.wpm;$('o-wpm').textContent=S.wpm+' mots/min';$('v-wpm').textContent=S.wpm+' mots/min';save();stats();hud()}
+function size(d){const max=sc.scrollHeight-sc.clientHeight;const r=max>0?pos/max:0;S.size=Math.min(96,Math.max(24,S.size+d));$('size').value=S.size;$('o-size').textContent=S.size+' px';save();layout();const m2=sc.scrollHeight-sc.clientHeight;pos=r*m2;sc.scrollTop=pos;lastSet=sc.scrollTop;hud()}
+$('start').addEventListener('click',openP);
+pp.addEventListener('click',toggle);
+sc.addEventListener('click',toggle);
+$('top').addEventListener('click',()=>{pos=0;sc.scrollTop=0;lastSet=0;hud()});
+$('slow').addEventListener('click',()=>speed(-5));
+$('fast').addEventListener('click',()=>speed(5));
+$('small').addEventListener('click',()=>size(-4));
+$('big').addEventListener('click',()=>size(4));
+$('mir').addEventListener('click',()=>{S.mirror=!S.mirror;$('mirror').checked=S.mirror;save();layout()});
+$('quit').addEventListener('click',closeP);
+document.addEventListener('fullscreenchange',()=>{if(!P.hidden)layout()});
+window.addEventListener('resize',()=>{if(!P.hidden)layout()});
+document.addEventListener('keydown',e=>{
+  if(P.hidden)return;
+  if(e.code==='Space'){e.preventDefault();toggle()}
+  else if(e.key==='ArrowUp'){e.preventDefault();speed(5)}
+  else if(e.key==='ArrowDown'){e.preventDefault();speed(-5)}
+  else if(e.key==='+'||e.key==='='){size(4)}
+  else if(e.key==='-'){size(-4)}
+  else if(e.key==='Home'){pos=0;sc.scrollTop=0;lastSet=0;hud()}
+  else if(e.key==='Escape'){closeP()}
+});
+</script>
+
+</body>
+</html>
